@@ -2,6 +2,8 @@
 
 A lightweight and premium Chrome extension designed for WordPress contributors and developers. It enhances the user experience on `<https://make.wordpress.org/>` by displaying a beautiful hover profile card when you hover over any contributor mention links.
 
+![WordPress Profile Hover Card Demo](demo.gif)
+
 ---
 
 ## Features
