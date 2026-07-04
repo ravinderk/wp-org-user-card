@@ -208,38 +208,7 @@
 }
 
 /* ==========================================================================
-   5. Card Footer (Required Credits)
-   ========================================================================== */
-
-.wp-profile-card-footer {
-  background-color: #f8fafc;
-  border-top: 1px solid #f1f5f9;
-  padding: 12px 16px;
-  font-size: 11px;
-  color: #64748b;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  text-align: center !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 4px !important;
-}
-
-.wp-profile-card-footer-link {
-  color: #0073aa !important;
-  text-decoration: none !important;
-  font-weight: 700 !important;
-  transition: color 0.15s ease !important;
-}
-
-.wp-profile-card-footer-link:hover {
-  color: #005177 !important;
-  text-decoration: underline !important;
-}
-
-/* ==========================================================================
-   6. Keyframe Animations
+   5. Keyframe Animations
    ========================================================================== */
 
 @keyframes wp-card-spin {

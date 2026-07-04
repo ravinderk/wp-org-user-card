@@ -376,16 +376,13 @@
     card.className = 'wp-profile-card wp-profile-card-hidden';
     card.id = 'wp-profile-card-container';
 
-    // Build inner skeleton (body and required Ravinder Kumar footer)
+    // Build inner skeleton (body)
     card.innerHTML = `
       <div class="wp-profile-card-body">
         <div class="wp-profile-card-loading">
           <div class="wp-profile-card-spinner"></div>
           <span>Loading profile data...</span>
         </div>
-      </div>
-      <div class="wp-profile-card-footer">
-        Made by <a href="https://profiles.wordpress.org/ravinderk/" target="_blank" rel="noopener noreferrer" class="wp-profile-card-footer-link">Ravinder Kumar</a> with ❤️ in India
       </div>
     `;
 
