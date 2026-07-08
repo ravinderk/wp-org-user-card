@@ -15,6 +15,7 @@
   let activeCard = null;       // Reference to the active card DOM container
   let activeAnchor = null;     // Reference to the anchor element currently hovered
   let hideTimeoutId = null;    // Timeout ID for debounce card removal
+  let showTimeoutId = null;    // Timeout ID for debounce card display
   let currentFetchUrl = null;   // Tracker to prevent async fetch race conditions
   const profileCache = new Map(); // Session cache to store already fetched profile hero HTML strings
 
@@ -79,6 +80,18 @@
       log('clearHideTimeout called');
       clearTimeout(hideTimeoutId);
       hideTimeoutId = null;
+    }
+  }
+
+  /**
+   * Clears any scheduled card display.
+   * Runs when mouse leaves the anchor link before the debounce period ends.
+   */
+  function clearShowTimeout() {
+    if (showTimeoutId) {
+      log('clearShowTimeout called');
+      clearTimeout(showTimeoutId);
+      showTimeoutId = null;
     }
   }
 
@@ -424,12 +437,28 @@
     anchor.addEventListener('mouseenter', () => {
       log('mouseenter on anchor element:', anchor.href);
       clearHideTimeout();
-      createHoverCard(anchor);
+
+      // If we are already displaying this exact anchor, do nothing but clear the hide timeout.
+      if (activeAnchor === anchor) {
+        log('Same anchor hovered, clearing hide timeout');
+        return;
+      }
+
+      clearShowTimeout();
+
+      showTimeoutId = setTimeout(() => {
+        log('showTimeout triggered, calling createHoverCard');
+        showTimeoutId = null;
+        createHoverCard(anchor);
+      }, 300); // 300ms debounce delay before creating hover card
     });
 
     anchor.addEventListener('mouseleave', () => {
       log('mouseleave on anchor element:', anchor.href);
-      startHideTimeout();
+      clearShowTimeout();
+      if (activeAnchor) {
+        startHideTimeout();
+      }
     });
   }
 
