@@ -11,6 +11,9 @@
   // Debug configuration flag
   const DEBUG = false;
 
+  // Cache TTL: 24 hours (for in-memory session cache)
+  const CACHE_TTL = 24 * 60 * 60 * 1000;
+
   // Global variables to track extension state
   let activeCard = null;       // Reference to the active card DOM container
   let activeAnchor = null;     // Reference to the anchor element currently hovered
@@ -52,6 +55,22 @@
       return url.origin === 'https://profiles.wordpress.org';
     } catch (e) {
       return false; // Invalid URL format
+    }
+  }
+
+  /**
+   * Helper to extract the username from a profiles.wordpress.org URL.
+   * Example: "https://profiles.wordpress.org/krupajnanda/" -> "krupajnanda"
+   * @param {string} urlStr 
+   * @returns {string} Username or empty string.
+   */
+  function getUsernameFromUrl(urlStr) {
+    try {
+      const url = new URL(urlStr);
+      const parts = url.pathname.split('/').filter(Boolean);
+      return parts[0] || '';
+    } catch (e) {
+      return '';
     }
   }
 
@@ -250,18 +269,82 @@
   }
 
   /**
+   * Constructs the HTML and updates the card body using structured profile data.
+   * @param {object} profileData
+   */
+  function renderProfileCard(profileData) {
+    const { absoluteAvatarUrl, fullname, jobline, links } = profileData;
+
+    let socialsHtml = '';
+    if (links && links.length > 0) {
+      socialsHtml = `
+        <div class="wp-user-card__socials">
+          ${links.map(link => {
+            const iconData = getLinkIcon(link.href, link.text);
+            return `
+              <a href="${escapeHtml(link.href)}" class="wp-user-card__social-btn" title="${escapeHtml(iconData.title)}" target="_blank" rel="noopener noreferrer">
+                ${iconData.svg}
+              </a>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    const cardHtml = `
+      <div class="wp-user-card__content">
+        ${absoluteAvatarUrl ? `
+          <div class="wp-user-card__avatar-container">
+            <img src="${escapeHtml(absoluteAvatarUrl)}" class="wp-user-card__avatar" alt="${escapeHtml(fullname)}">
+          </div>
+        ` : ''}
+        <div class="wp-user-card__details">
+          ${fullname ? `<h2 class="wp-user-card__name">${escapeHtml(fullname)}</h2>` : ''}
+          ${jobline ? `<p class="wp-user-card__jobline">${escapeHtml(jobline)}</p>` : ''}
+          ${socialsHtml}
+        </div>
+      </div>
+    `;
+
+    updateCardContent(cardHtml);
+  }
+
+  /**
    * Triggers fetching and processing of the profile URL.
-   * Fetches profile URL content via background script.
+   * Leverages session storage for caching structured JSON.
    * @param {string} targetUrl - Profile URL to fetch.
    */
   async function fetchProfileData(targetUrl) {
     currentFetchUrl = targetUrl;
+    const username = getUsernameFromUrl(targetUrl);
+    const cacheKey = `profile_wordpress_org_cache_${username}`;
+
+    try {
+      // 1. Try checking session storage cache first
+      if (chrome.storage && chrome.storage.session) {
+        const cached = await chrome.storage.session.get(cacheKey);
+        if (cached && cached[cacheKey]) {
+          const { data, timestamp } = cached[cacheKey];
+          if (Date.now() - timestamp < CACHE_TTL) {
+            log('Serving from session storage cache:', targetUrl);
+            // Safety check: ensure target matches current hover
+            if (currentFetchUrl === targetUrl && activeCard) {
+              renderProfileCard(data);
+            }
+            return;
+          }
+          log('Session cache expired for:', targetUrl);
+        }
+      }
+    } catch (storageError) {
+      logWarn('Error reading from chrome.storage.session:', storageError);
+    }
 
     log('Sending message to Background SW for URL:', targetUrl);
 
-    chrome.runtime.sendMessage({ action: 'fetchProfile', url: targetUrl }, (response) => {
+    chrome.runtime.sendMessage({ action: 'fetchProfile', url: targetUrl }, async (response) => {
       log('Received response from Background SW. Response:', response);
-      // Safety check: ensure the response matches the current hover target and active card exists
+      // Safety check: ensure response matches current hover target and active card exists
       if (currentFetchUrl !== targetUrl || !activeCard) {
         logWarn('Fetch callback bypassed: currentFetchUrl matches =', currentFetchUrl === targetUrl, 'activeCard exists =', !!activeCard);
         return;
@@ -306,39 +389,31 @@
             absoluteAvatarUrl = new URL(avatarUrl, 'https://profiles.wordpress.org/').href;
           }
 
-          // Build clean BEM card layout with horizontal social icons row
-          let socialsHtml = '';
-          if (links.length > 0) {
-            socialsHtml = `
-              <div class="wp-user-card__socials">
-                ${links.map(link => {
-                  const iconData = getLinkIcon(link.href, link.text);
-                  return `
-                    <a href="${escapeHtml(link.href)}" class="wp-user-card__social-btn" title="${escapeHtml(iconData.title)}" target="_blank" rel="noopener noreferrer">
-                      ${iconData.svg}
-                    </a>
-                  `;
-                }).join('')}
-              </div>
-            `;
+          const profileData = {
+            absoluteAvatarUrl,
+            fullname,
+            jobline,
+            links
+          };
+
+          // Save response to session storage cache
+          try {
+            if (chrome.storage && chrome.storage.session) {
+              await chrome.storage.session.set({
+                [cacheKey]: {
+                  data: profileData,
+                  timestamp: Date.now()
+                }
+              });
+              log('Saved to session storage cache:', targetUrl);
+            }
+          } catch (storageError) {
+            logWarn('Error writing to chrome.storage.session:', storageError);
           }
 
-          const cardHtml = `
-            <div class="wp-user-card__content">
-              ${absoluteAvatarUrl ? `
-                <div class="wp-user-card__avatar-container">
-                  <img src="${escapeHtml(absoluteAvatarUrl)}" class="wp-user-card__avatar" alt="${escapeHtml(fullname)}">
-                </div>
-              ` : ''}
-              <div class="wp-user-card__details">
-                ${fullname ? `<h2 class="wp-user-card__name">${escapeHtml(fullname)}</h2>` : ''}
-                ${jobline ? `<p class="wp-user-card__jobline">${escapeHtml(jobline)}</p>` : ''}
-                ${socialsHtml}
-              </div>
-            </div>
-          `;
-
-          updateCardContent(cardHtml);
+          if (currentFetchUrl === targetUrl && activeCard) {
+            renderProfileCard(profileData);
+          }
         } catch (e) {
           logError('Error parsing profile HTML:', e);
           showCardError('Error parsing profile data.');

@@ -4,7 +4,22 @@
  */
 
 // Global cache configuration
-const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+// Setup storage access levels and clear old caches on install/update
+chrome.runtime.onInstalled.addListener(() => {
+  // Allow content scripts to read/write chrome.storage.session directly
+  if (chrome.storage.session && typeof chrome.storage.session.setAccessLevel === 'function') {
+    chrome.storage.session.setAccessLevel({
+      accessLevel: 'TRUSTED_AND_UNTRUSTED_CONTEXTS'
+    }).catch(err => {
+      console.error('Failed to set session storage access level:', err);
+    });
+  }
+
+  // Clear legacy chrome.storage.local cache data
+  chrome.storage.local.clear(() => {
+    console.log('Legacy chrome.storage.local cleared on installation/update.');
+  });
+});
 
 // Listener for messages from the content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -20,24 +35,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           throw new Error('Unauthorized host. Fetching is restricted to profiles.wordpress.org.');
         }
 
-        const cacheKey = `profile_cache_${urlString}`;
-
-        // Try checking local storage cache first
-        try {
-          const cached = await chrome.storage.local.get(cacheKey);
-          if (cached && cached[cacheKey]) {
-            const { html, timestamp } = cached[cacheKey];
-            if (Date.now() - timestamp < CACHE_TTL) {
-              console.log('Serving from local storage cache:', urlString);
-              sendResponse({ success: true, html: html });
-              return;
-            }
-            console.log('Cache expired for:', urlString);
-          }
-        } catch (storageError) {
-          console.warn('Error reading from chrome.storage.local:', storageError);
-        }
-
         // Perform the remote fetch request
         const response = await fetch(urlString, {
           method: 'GET',
@@ -51,20 +48,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const htmlText = await response.text();
-
-        // Save response to local storage cache
-        try {
-          await chrome.storage.local.set({
-            [cacheKey]: {
-              html: htmlText,
-              timestamp: Date.now()
-            }
-          });
-          console.log('Saved to local storage cache:', urlString);
-        } catch (storageError) {
-          console.warn('Error writing to chrome.storage.local:', storageError);
-        }
-
         sendResponse({ success: true, html: htmlText });
       } catch (error) {
         console.error('Error fetching profile in service worker:', error);
