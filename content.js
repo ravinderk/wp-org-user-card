@@ -16,7 +16,6 @@
   let activeAnchor = null;     // Reference to the anchor element currently hovered
   let hideTimeoutId = null;    // Timeout ID for debounce card removal
   let currentFetchUrl = null;   // Tracker to prevent async fetch race conditions
-  const profileCache = new Map(); // Session cache to store already fetched profile hero HTML strings
 
   /**
    * Conditional logging helpers
@@ -239,18 +238,11 @@
 
   /**
    * Triggers fetching and processing of the profile URL.
-   * Checks the profileCache first to bypass redundant network requests.
+   * Fetches profile URL content via background script.
    * @param {string} targetUrl - Profile URL to fetch.
    */
   async function fetchProfileData(targetUrl) {
     currentFetchUrl = targetUrl;
-
-    // Check if the HTML is already cached in this session
-    if (profileCache.has(targetUrl)) {
-      log('Bypassing network. Loading profile from session cache:', targetUrl);
-      updateCardContent(profileCache.get(targetUrl));
-      return;
-    }
 
     log('Sending message to Background SW for URL:', targetUrl);
 
@@ -332,9 +324,6 @@
               </div>
             </div>
           `;
-
-          // Cache the processed HTML content for future hover events
-          profileCache.set(targetUrl, cardHtml);
 
           updateCardContent(cardHtml);
         } catch (e) {
