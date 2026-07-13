@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WordPress Profile Hover Card",
   "version": "1.0.0",
-  "description": "Injects a hover card that previews WordPress profiles on make.wordpress.org when hovering over profile mention links.",
+  "description": "Injects a hover card that previews WordPress profiles on {make|developer}.wordpress.org when hovering over profile mention links.",
   "background": {
     "service_worker": "background.js"
   },
